@@ -3,7 +3,7 @@
 
 #include "aes.h"
 
-#define DEBUG_MODE 1
+#define DEBUG_MODE 0
 
 void print_format(const char* format, ...);
 void print_hex(BYTE str[], int len, char* title);

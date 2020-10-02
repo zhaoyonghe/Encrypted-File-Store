@@ -72,7 +72,7 @@ char* get_real_file_name(char const * raw_name) {
 	return name;
 }
 
-int deal_with_pw(int argc, char const *argv[], BYTE key[]) {
+int deal_with_pw(int argc, char const *argv[], BYTE verification_key[], BYTE crypt_key[]) {
 	char const * password;
 	int arch_name_i;
 	if (strcmp(argv[2], "-p") == 0) {
@@ -94,8 +94,14 @@ int deal_with_pw(int argc, char const *argv[], BYTE key[]) {
 	sha256_init(&ctx);
 	for (int idx = 0; idx < 10000; idx++)
 	   sha256_update(&ctx, (BYTE*)password, strlen(password));
-	sha256_final(&ctx, key);
-	print_hex(key, SHA_OUTPUT_SIZE, "key (pw hash):");
+	sha256_final(&ctx, verification_key);
+	print_hex(verification_key, SHA_OUTPUT_SIZE, "verification_key (pw hash 10000 times):");
+
+	sha256_init(&ctx);
+	for (int idx = 0; idx < 20000; idx++)
+	   sha256_update(&ctx, (BYTE*)password, strlen(password));
+	sha256_final(&ctx, crypt_key);
+	print_hex(crypt_key, SHA_OUTPUT_SIZE, "crypt_key (pw hash 20000 times):");
 	return arch_name_i;
 }
 
@@ -207,21 +213,21 @@ int collect(char archive_path[], struct ARCHIVE_INFO* info, int mode) {
 	return 0;
 }
 
-int get_hmac_of_archive(char archive_path[], struct ARCHIVE_INFO* info, const BYTE key[]) {
+int get_hmac_of_archive(char archive_path[], struct ARCHIVE_INFO* info, const BYTE verification_key[]) {
 	if (collect(archive_path, info, COLLECT_SIZE_PHASE) < 0) {
 		return -1;
 	}
 	if (collect(archive_path, info, COLLECT_CONTENT_PHASE) < 0) {
 		return -1;
 	}
-	hmac(key, info->content, info->size, info->new_hmac);
+	hmac(verification_key, info->content, info->size, info->new_hmac);
 	return 0;
 }
 
-int recalculate_archive(char path_buf[], const BYTE key[]) {
+int recalculate_archive(char path_buf[], const BYTE verification_key[]) {
 	struct ARCHIVE_INFO info;
 	init_archive_info(&info);
-	if (get_hmac_of_archive(path_buf, &info, key) < 0) {
+	if (get_hmac_of_archive(path_buf, &info, verification_key) < 0) {
 		return -1;
 	}
 	FILE* hmac_file;
@@ -241,10 +247,10 @@ int recalculate_archive(char path_buf[], const BYTE key[]) {
 	return 0;
 }
 
-int verify_archive(char path_buf[], const BYTE key[]) {
+int verify_archive(char path_buf[], const BYTE verification_key[]) {
 	struct ARCHIVE_INFO info;
 	init_archive_info(&info);
-	if (get_hmac_of_archive(path_buf, &info, key) < 0) {
+	if (get_hmac_of_archive(path_buf, &info, verification_key) < 0) {
 		return -1;
 	}
 	for (int i = 0; i < SHA_OUTPUT_SIZE; i++) {
@@ -286,11 +292,12 @@ int main(int argc, char const *argv[]) {
 	strcat(path_buf, root_dir);
 
 	int arch_name_i;
-	BYTE key[SHA_OUTPUT_SIZE];
+	BYTE verification_key[SHA_OUTPUT_SIZE];
+	BYTE crypt_key[SHA_OUTPUT_SIZE];
 
 	// init
 	if (cmd_type == INIT_CMD) {
-		if ((arch_name_i = deal_with_pw(argc, argv, key)) < 0) {
+		if ((arch_name_i = deal_with_pw(argc, argv, verification_key, crypt_key)) < 0) {
 			return -1;
 		}
 		strcat(path_buf, argv[arch_name_i]);
@@ -318,7 +325,8 @@ int main(int argc, char const *argv[]) {
 		}
 		fclose(init_file);
 		clear_path_buf(path_buf, archive_path_len);
-		recalculate_archive(path_buf, key);
+		recalculate_archive(path_buf, verification_key);
+		printf("Archive %s is successfully initialized.\n", argv[arch_name_i]);
 		return 0;
 	}
 
@@ -342,7 +350,7 @@ int main(int argc, char const *argv[]) {
 	}
 
 	// deal with the password
-	if ((arch_name_i = deal_with_pw(argc, argv, key)) < 0) {
+	if ((arch_name_i = deal_with_pw(argc, argv, verification_key, crypt_key)) < 0) {
 		return -1;
 	}
 
@@ -356,16 +364,16 @@ int main(int argc, char const *argv[]) {
 	archive_path_len = strlen(path_buf);
 
 	// validate the password or integrity
-	int verify_status = verify_archive(path_buf, key);
+	int verify_status = verify_archive(path_buf, verification_key);
 	if (verify_status == -1) {
 		return -1;
 	}
 	if (verify_status == 1) {
-		printf("The integrity of archive %s is broken by someone.\n", argv[arch_name_i]);
+		printf("Your password is not correct or the integrity of archive %s is broken by someone.\n", argv[arch_name_i]);
 		return -1;
 	}
 
-	printf("Password is correct.\n");
+	printf("Password verification passed.\n");
 
 	
 	if (strcmp(argv[1], "add") == 0) {
@@ -385,7 +393,7 @@ int main(int argc, char const *argv[]) {
 
 			get_random_iv(iv, AES_BLOCK_SIZE);
 
-			if (encrypt_file(argv[i], path_buf, key, KEY_LEN, iv) < 0) {
+			if (encrypt_file(argv[i], path_buf, crypt_key, KEY_LEN, iv) < 0) {
 				free(real_file_name);
 				return -1;
 			}
@@ -410,7 +418,7 @@ int main(int argc, char const *argv[]) {
 			clear_path_buf(path_buf, archive_path_len);
 			free(real_file_name);
 		}
-		recalculate_archive(path_buf, key);
+		recalculate_archive(path_buf, verification_key);
 	} else if (strcmp(argv[1], "extract") == 0) {
 		BYTE iv[AES_BLOCK_SIZE];
 		for (int i = arch_name_i + 1; i < argc; i++) {
@@ -438,7 +446,7 @@ int main(int argc, char const *argv[]) {
 			clear_path_buf(path_buf, archive_path_len);
 			strcat(path_buf, "_");
 			strcat(path_buf, argv[i]);
-			if (decrypt_file(path_buf, argv[i], key, KEY_LEN, iv) < 0) {
+			if (decrypt_file(path_buf, argv[i], crypt_key, KEY_LEN, iv) < 0) {
 				return -1;
 			}
 
@@ -473,7 +481,7 @@ int main(int argc, char const *argv[]) {
 			printf("File %s is successfully deleted from archive %s.\n", argv[i], argv[arch_name_i]);
 			clear_path_buf(path_buf, archive_path_len);
 		}
-		recalculate_archive(path_buf, key);
+		recalculate_archive(path_buf, verification_key);
 	}
 	
 	return 0;

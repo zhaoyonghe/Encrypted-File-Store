@@ -1,10 +1,8 @@
-default: main test
+default: clean all
 
-main: utils.o sha256.o hmac.o aes.o my_aes_cbc.o
+all: utils.o sha256.o hmac.o aes.o my_aes_cbc.o
 	gcc main.c utils.o sha256.o hmac.o aes.o my_aes_cbc.o -o cstore
-
-test: clean utils.o aes.o my_aes_cbc.o sha256.o hmac.o
-	gcc test.c utils.o aes.o my_aes_cbc.o sha256.o hmac.o -o test
+	gcc test.c utils.o sha256.o hmac.o aes.o my_aes_cbc.o -o cstore_test
 
 my_aes_cbc.o:
 	gcc -c my_aes_cbc.c
@@ -21,9 +19,8 @@ sha256.o:
 utils.o:
 	gcc -c utils.c
 
-.PHONY: clean
 clean:
 	rm *.o *.txt test cstore || true
 
-.PHONY: all
-all: clean default
+test:
+	./cstore_test

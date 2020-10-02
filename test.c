@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <memory.h>
 #include "aes.h"
 #include "my_aes_cbc.h"
@@ -107,11 +108,125 @@ int hmac_test() {
 	return pass;
 }
 
+void print_run_cmd(char* cmd) {
+	printf("%s\n", cmd);
+	system(cmd);
+}
+
 int main(int argc, char *argv[]) {
-	//printf("My RAW AES CBC mode tests: %s\n", my_raw_aes_cbc_test() ? "SUCCEEDED" : "FAILED");
+	printf("=========== Unit tests ===========\n");
+	printf("My RAW AES CBC mode tests: %s\n", my_raw_aes_cbc_test() ? "SUCCEEDED" : "FAILED");
 	//printf("%d\n", get_file_size("./testfiles/a.txt"));
 	//printf("%d\n", encrypt_file("./testfiles/a.txt", "./encrypt.txt", key[0], KEY_LEN, iv[0]));
 	//printf("%d\n", decrypt_file("./encrypt.txt", "./recover.txt", key[0], KEY_LEN, iv[0]));
 	printf("My hmac tests: %s\n", hmac_test() ? "SUCCEEDED" : "FAILED");
+
+	printf("=========== Funtional tests ===========\n");
+	printf("[STEP] Clean up the environment.\n");
+	print_run_cmd("rm -rf /tmp/cstore");
+	printf("\n");
+
+	printf("[STEP] Archive my_archive should be successfully initialized with password hahaha.\n");
+	print_run_cmd("./cstore init -p hahaha my_archive");
+	printf("\n");
+
+	printf("[STEP] Archive my_archive cannot be reinitialized.\n");
+	print_run_cmd("./cstore init -p hahaha my_archive");
+	printf("\n");
+
+	printf("[STEP] Now, no file is in my_archive\n");
+	print_run_cmd("./cstore list my_archive");
+	printf("\n");
+
+	printf("[STEP] Typo, my_archiv does not exist.\n");
+	print_run_cmd("./cstore list my_archiv");
+	printf("\n");
+
+	printf("[STEP] Add ./testfiles/a.txt to my_archive.\n");
+	print_run_cmd("./cstore add -p hahaha my_archive ./testfiles/a.txt");
+	printf("\n");
+
+	printf("[STEP] Now, a.txt is in my_archive.\n");
+	print_run_cmd("./cstore list my_archive");
+	printf("\n");
+
+	printf("[STEP] Add ./testfiles/a.txt, ./testfiles/b.txt to my_archive. Since a.txt already exists, only b.txt can be added.\n");
+	print_run_cmd("./cstore add -p hahaha my_archive ./testfiles/a.txt ./testfiles/b.txt");
+	printf("\n");
+
+	printf("[STEP] Now, a.txt and b.txt are in my_archive.\n");
+	print_run_cmd("./cstore list my_archive");
+	printf("\n");
+
+	printf("[STEP] ./testfiles/c.txt cannot be added to my_archive with wrong password.\n");
+	print_run_cmd("./cstore add -p wrong my_archive ./testfiles/a.txt");
+	printf("\n");
+
+	printf("[STEP] Now, only a.txt and b.txt are in my_archive.\n");
+	print_run_cmd("./cstore list my_archive");
+	printf("\n");
+
+	printf("[STEP] Files in my_archive are encrypted.\n");
+	printf("Plain text of a.txt:\n");
+	system("cat ./testfiles/a.txt");
+	printf("\n");
+	printf("Cipher text of a.txt in my_archive:\n");
+	system("cat /tmp/cstore/my_archive/_a.txt");
+	printf("\n");
+	printf("Plain text of b.txt:\n");
+	system("cat ./testfiles/b.txt");
+	printf("\n");
+	printf("Cipher text of b.txt in my_archive:\n");
+	system("cat /tmp/cstore/my_archive/_b.txt");
+	printf("\n");
+	printf("\n");
+
+	printf("[STEP] Files cannot be extracted with wrong password.\n");
+	print_run_cmd("./cstore extract -p bad my_archive a.txt b.txt c.txt");
+	printf("\n");
+
+	printf("[STEP] Extract a.txt, b.txt, c.txt to current working directory. Since c.txt is not in my_archive, only a.txt and b.txt can be extracted.\n");
+	print_run_cmd("./cstore extract -p hahaha my_archive a.txt b.txt c.txt");
+	printf("\n");
+	
+	printf("[STEP] The content of a.txt and b.txt keep same.\n");
+	printf("Original a.txt:\n");
+	system("cat ./testfiles/a.txt");
+	printf("\n");
+	printf("a.txt extracted from my_archive:\n");
+	system("cat ./a.txt");
+	printf("\n");
+	printf("Original b.txt:\n");
+	system("cat ./testfiles/b.txt");
+	printf("\n");
+	printf("b.txt extracted from my_archive:\n");
+	system("cat ./b.txt");
+	printf("\n");
+	printf("\n");
+
+	printf("[STEP] Files cannot be deleted with wrong password.\n");
+	print_run_cmd("./cstore delete -p i_want_to_delete my_archive b.txt c.txt");
+	printf("\n");
+
+	printf("[STEP] Delete b.txt, c.txt. Since c.txt is not in my_archive, only b.txt can be deleted.\n");
+	print_run_cmd("./cstore delete -p hahaha my_archive b.txt c.txt");
+	printf("\n");
+
+	printf("[STEP] Now, we only have a.txt in my_archive\n");
+	print_run_cmd("./cstore list my_archive");
+	printf("\n");
+
+	printf("[STEP] Now, I can extract a.txt.\n");
+	print_run_cmd("rm *.txt");
+	print_run_cmd("./cstore extract -p hahaha my_archive a.txt");
+	printf("\n");
+
+	printf("[STEP] A bad guy tampered my_archive.\n");
+	print_run_cmd("echo a >> /tmp/cstore/my_archive/_a.txt");
+	printf("\n");
+
+	printf("[STEP] Now, I cannot extract a.txt even if I use the correct password.\n");
+	print_run_cmd("./cstore extract -p hahaha my_archive a.txt");
+	printf("\n");
 	return 0;
 }
