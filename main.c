@@ -176,7 +176,7 @@ int collect(char archive_path[], struct ARCHIVE_INFO* info, int mode) {
 		print_format("%s size:%ld\n", archive_path, fstat.st_size);
 		if (mode == COLLECT_SIZE_PHASE) {
 			if (!is_hmac_entry(entry)) {
-				info->size += (fstat.st_size + strlen(entry->d_name));
+				info->size += (fstat.st_size + sizeof(off_t) + strlen(entry->d_name) + sizeof(size_t));
 				print_format("archive size:%d\n", info->size);
 			}
 		} else if (mode == COLLECT_CONTENT_PHASE) {
@@ -200,8 +200,13 @@ int collect(char archive_path[], struct ARCHIVE_INFO* info, int mode) {
 					return -1;
 				}
 				info->offset += fstat.st_size;
-				memcpy(info->content + info->offset, entry->d_name, strlen(entry->d_name));
-				info->offset += strlen(entry->d_name);
+				memcpy(info->content + info->offset, &fstat.st_size, sizeof(off_t));
+				info->offset += sizeof(off_t);
+				size_t tmp_len = strlen(entry->d_name);
+				memcpy(info->content + info->offset, entry->d_name, tmp_len);
+				info->offset += tmp_len;
+				memcpy(info->content + info->offset, &tmp_len, sizeof(size_t));
+				info->offset += sizeof(size_t);
 			}
 			fclose(src_file);
 			// print_hex(info->content, info->offset, "now");
