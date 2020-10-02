@@ -1,0 +1,7 @@
+cstore supports 5 commands: init, list, add, extract, delete. 
+
+init: cstore init [-p password] <archive name>
+Display an error when
+1. the argument number is more than 2.
+2. the archive already exists.
+3. cannot create initial files for the archive for some reasons.
