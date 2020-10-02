@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
 	//printf("%d\n", decrypt_file("./encrypt.txt", "./recover.txt", key[0], KEY_LEN, iv[0]));
 	printf("My hmac tests: %s\n", hmac_test() ? "SUCCEEDED" : "FAILED");
 
-	printf("=========== Funtional tests ===========\n");
+	printf("=========== Functional tests ===========\n");
 	printf("[STEP] Clean up the environment.\n");
 	print_run_cmd("rm -rf /tmp/cstore");
 	printf("\n");
